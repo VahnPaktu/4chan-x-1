@@ -1437,7 +1437,7 @@
       return $.on(d, 'keydown', Keybinds.keydown);
     },
     keydown: function(e) {
-      var form, key, o, target, thread;
+      var button, form, key, o, target, thread;
       if (!(key = Keybinds.keyCode(e))) {
         return;
       }
@@ -1504,14 +1504,14 @@
           window.location = "/" + g.BOARD + "/0#delform";
           break;
         case Conf.nextPage:
-          if (form = $('.next form')) {
-            window.location = form.action;
-          }
+          if (button=$("input[value=Next]",d)){
+		  button.click();
+		  }
           break;
         case Conf.previousPage:
-          if (form = $('.prev form')) {
-            window.location = form.action;
-          }
+          if (button=$("input[value=Previous]",d)){
+		  button.click();
+		  }
           break;
         case Conf.nextThread:
           if (g.REPLY) {
@@ -1762,11 +1762,29 @@
       return $('.board');
     },
     scroll: function(delta) {
-      var i, rect, thread, top, _ref, _ref1;
+      var button, i, link, rect, thread, top, _ref, _ref1;
       _ref = Nav.getThread(true), thread = _ref[0], i = _ref[1], rect = _ref[2];
       top = rect.top;
       if (!((delta === -1 && Math.ceil(top) < 0) || (delta === +1 && top > 1))) {
         i += delta;
+      }
+      if (i === -1) {
+        if (g.PAGENUM === 0) {
+          window.scrollTo(0, 0);
+        } else {
+          if (button = $("input[value=Previous]", d)) {
+            button.click();
+          }
+        }
+        return;
+      }
+      if (delta === +1) {
+        if (i >= Nav.threads.length || (innerHeight + pageYOffset >= d.body.scrollHeight)) {
+          if (button = $("input[value=Next]", d)) {
+             button.click();
+          }
+          return;
+        }
       }
       top = (_ref1 = Nav.threads[i]) != null ? _ref1.getBoundingClientRect().top : void 0;
       return window.scrollBy(0, top);
@@ -5540,6 +5558,10 @@
           break;
         case 'catalog':
           g.CATALOG = true;
+		  break;
+		default:
+		  g.PAGENUM = parseInt(temp) || 0;
+		  break;
       }
       for (key in Conf) {
         val = Conf[key];
