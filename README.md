@@ -13,10 +13,18 @@ Make sure you have greasemonkey installed and just click on the previous link.
 ### Chrome/Chromium/Opera:
 
 Install tampermonkey or equivalent and then just click on the previuos link.
-Not working on Opera 12.16 because of issue #11
 
+### dwb:
+1. Install dwb with your package manager
+2. Install the dwb userscripts extension with `dwbem -N -i userscripts` in your terminal.
+3. Make a directory for dwb userscripts with `mkdir .config/dwb/greasemonkey`
+4. Change directory to your newly created userscripts folder with `cd .config/dwb/greasemonkey`
+5. Download 4chanX with `wget https://github.com/loadletter/4chan-x/raw/master/4chan_x.user.js`
+6. Start dwb
 
 ##Changelog
+- 2.40.29: Fix captcha loading in Opera presto (12.17)
+- 2.40.28: Fix some security issues and reveal the filename when reveal spoilers is enabled
 - 2.40.27: Change cooldowns on /vg/
 - 2.40.26: Fix moot changing titles for all the quote stuff (Thanks to WhatIsThisImNotGoodWithComputers, from MayhemYDG's 3.x)
 - 2.40.25: Fix Reveal Spoilers feature

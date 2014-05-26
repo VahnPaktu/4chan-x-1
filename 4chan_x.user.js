@@ -1,15 +1,19 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.40.27
+// @version        2.40.29
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
 // @copyright      2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
 // @license        MIT; http://en.wikipedia.org/wiki/Mit_license
-// @match          *://boards.4chan.org/*
-// @match          *://sys.4chan.org/*
-// @match          *://a.4cdn.org/*
-// @match          *://i.4cdn.org/*
+// @include        http://boards.4chan.org/*
+// @include        https://boards.4chan.org/*
+// @include        http://sys.4chan.org/*
+// @include        https://sys.4chan.org/*
+// @include        http://a.4cdn.org/*
+// @include        https://a.4cdn.org/*
+// @include        http://i.4cdn.org/*
+// @include        https://i.4cdn.org/*
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_deleteValue
@@ -184,6 +188,7 @@
       openOptions: ['ctrl+o', 'Open Options'],
       close: ['Esc', 'Close Options or QR'],
       spoiler: ['ctrl+s', 'Quick spoiler tags'],
+      sageru: ['alt+n', 'Sage keybind'],
       code: ['alt+c', 'Quick code tags'],
       submit: ['alt+s', 'Submit post'],
       watch: ['w', 'Watch thread'],
@@ -1483,6 +1488,10 @@
           }
           Keybinds.tags('code', target);
           break;
+        case Conf.sageru:
+          $("[name=email]", QR.el).value = "sage";
+          QR.selected.email = "sage";
+          break;
         case Conf.watch:
           Watcher.toggle(thread);
           break;
@@ -2322,6 +2331,7 @@
         }
       },
       ready: function() {
+        var MutationObserver;
         var _this = this;
         if (this.challenge = $.id('recaptcha_challenge_field_holder')) {
           $.off($.id('captchaContainer'), 'DOMNodeInserted', this.onready);
@@ -2355,17 +2365,35 @@
         } catch(e) {
           /* do nothing */
         }
-        CaptchaObserver = new MutationObserver(QR.captcha.load.bind(QR.captcha)).observe(this.challenge, {
-          childList: true,
-          subtree: true,
-          attributes: true
-        });
+        if (MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.OMutationObserver) {
+          CaptchaObserver = new MutationObserver(QR.captcha.load.bind(QR.captcha));
+          CaptchaObserver.observe(this.challenge, {
+            childList: true,
+            subtree: true,
+            attributes: true
+          });
+        } else {
+          $.on(this.challenge, 'DOMNodeInserted', QR.captcha.load);
+          $.on(this.challenge, 'DOMSubtreeModified', QR.captcha.load);
+          $.on(this.challenge, 'DOMAttrModified', QR.captcha.load);
+        }
         /* always load to update image */
         return _this.load();
       },
       load: function() {
         var challenge;
-        challenge = this.challenge.firstChild.value;
+        
+        /* begin opera hack */
+        try {
+          challenge = this.challenge.firstChild.value;
+        } catch(e) {
+          if(QR.captcha.challenge.firstChild === null) {
+            return;
+          }
+          challenge = QR.captcha.challenge.firstChild.value;
+        }
+        /* end opera hack */
+        
         CaptchaImg.alt = challenge;
         CaptchaImg.src = "//www.google.com/recaptcha/api/image?c=" + challenge;
         return CaptchaInput.value = null;
@@ -3510,6 +3538,7 @@
       img.removeAttribute('style');
       s = img.style;
       s.maxHeight = s.maxWidth = /\bop\b/.test(post["class"]) ? '250px' : '125px';
+      post.fileInfo.firstElementChild.textContent = post.el.getElementsByClassName('fileText')[0].title;
       return img.src = "//t.4cdn.org" + (img.parentNode.pathname.replace(/(\d+).+$/, '$1s.jpg'));
     }
   };
@@ -3734,6 +3763,11 @@
       }
       return "" + size + " " + unitT;
     },
+    escape: function(name) {
+      return name.replace(/<|>/g, function(c) {
+        return c === '<' && '&lt;' || '&gt;';
+      });
+    },
     formatters: {
       t: function() {
         return FileInfo.data.link.match(/\d+\..+$/)[0];
@@ -3749,13 +3783,13 @@
       },
       n: function() {
         if (FileInfo.data.fullname === FileInfo.data.shortname) {
-          return FileInfo.data.fullname;
+          return FileInfo.escape(FileInfo.data.fullname);
         } else {
-          return "<span class=fntrunc>" + FileInfo.data.shortname + "</span><span class=fnfull>" + FileInfo.data.fullname + "</span>";
+          return "<span class=fntrunc>" + FileInfo.escape(FileInfo.data.shortname) + "</span><span class=fnfull>" + FileInfo.escape(FileInfo.data.fullname) + "</span>";
         }
       },
       N: function() {
-        return FileInfo.data.fullname;
+        return FileInfo.escape(FileInfo.data.fullname);
       },
       p: function() {
         if (FileInfo.data.spoiler) {
@@ -4011,7 +4045,7 @@
         o.file = {
           name: data.filename + data.ext,
           timestamp: "" + data.tim + data.ext,
-          url: "//i.4cdn.org/" + board + "/" + data.tim + data.ext,
+          url: board === 'f' ? "//i.4cdn.org/" + board + "/" + (encodeURIComponent(data.filename)) + data.ext : "//i.4cdn.org/" + board + "/" + data.tim + data.ext,
           height: data.h,
           width: data.w,
           MD5: data.md5,
@@ -4088,7 +4122,7 @@
             file.twidth = file.theight = 100;
           }
         }
-        imgSrc = ("<a class='fileThumb" + (file.isSpoiler ? ' imgspoiler' : '') + "' href='" + file.url + "' target=_blank>") + ("<img src='" + fileThumb + "' alt='" + fileSize + "' data-md5=" + file.MD5 + " style='width:" + file.twidth + "px;height:" + file.theight + "px'></a>");
+        imgSrc = board === 'f' ? '' : ("<a class='fileThumb" + (file.isSpoiler ? ' imgspoiler' : '') + "' href=\"" + file.url + "\" target=_blank>") + ("<img src='" + fileThumb + "' alt='" + fileSize + "' data-md5=" + file.MD5 + " style='width:" + file.twidth + "px;height:" + file.theight + "px'></a>");
         a = $.el('a', {
           innerHTML: file.name
         });
@@ -4098,7 +4132,7 @@
         a.textContent = filename;
         filename = a.innerHTML.replace(/'/g, '&apos;');
         fileDims = ext === 'pdf' ? 'PDF' : "" + file.width + "x" + file.height;
-        fileInfo = ("<div class=fileText id=fT" + postID + (file.isSpoiler ? " title='" + filename + "'" : '') + ">File: <a" + ((filename !== shortFilename && !file.isSpoiler) ? " title='" + filename + "'" : '') + " href='" + file.url + "' target=_blank>" + (file.isSpoiler ? 'Spoiler Image' : shortFilename) + "</a>") + ("-(" + fileSize + ", " + fileDims) + ")</div>";
+        fileInfo = ("<div class=fileText id=fT" + postID + (file.isSpoiler ? " title='" + filename + "'" : '') + ">File: <a" + ((filename !== shortFilename && !file.isSpoiler) ? " title='" + filename + "'" : '') + " href=\"" + file.url + "\" target=_blank>" + (file.isSpoiler ? 'Spoiler Image' : shortFilename) + "</a>") + ("-(" + fileSize + ", " + fileDims) + ")</div>";
         fileHTML = "<div class=file id=f" + postID + ">" + fileInfo + imgSrc + "</div>";
       } else {
         fileHTML = '';
@@ -5975,7 +6009,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.40.27',
+    version: '2.40.29',
     callbacks: [],
     css: '\
 /* dialog styling */\
